@@ -104,3 +104,11 @@ function getAverageColor(chosenPixels) {
 function randomWithinRange(value,range){
   return value-range+Math.random()*range*2;
 }
+
+function calcWeightedAverage(data,weights){
+  var weightedAverage = 0;
+  for(var i=0; i<data.length; i++){
+      weightedAverage += data[i]*weights[i];
+  }
+  return weightedAverage;
+}

@@ -1,17 +1,17 @@
 /* To do:
 
 GUI menu
-- Amplitude / frequency of X+Y waves
+- Add button to randomize inputs (r)
 - Custom color palette picker?
 - Custom width / height size, rather than resize based on broweer window?
 - Control the level of randomness (probably should improve the randomness)
-- Add button to randomize inputs (r)
-
 
 Improvements:
+- Other movement modes? Toggle for movement. Change the dx / dy logic to create different kinds of shapes (rectangles, more irregular patterns?)
 - Other styles for the background image? Other gradient type, non-gradient, random image, input image??
 - Glitching / visual randomness / noise
 - Add other color palettes (check ig / x art inspo, add black & white theme)
+- press c to change color palette
 
 Other ideas (probably separate tools?)
 - Use this canvas as a mask which is revealed by T-Rex cam or edge detecton, or low luminosity pixels instead?
@@ -197,6 +197,8 @@ var videofps = 20;
 //add gui
 var obj = {
     animationSpeed: 5,
+    xStretch: 8,
+    yStretch: 12,
     colorPalette: "Rushmore1",
     gradient: "Radial",
 };
@@ -205,7 +207,9 @@ var gui = new dat.gui.GUI( { autoPlace: false } );
 //gui.close();
 var guiOpenToggle = true;
 
-gui.add(obj, "animationSpeed").min(1).max(20).step(1).name('Animation Speed')
+gui.add(obj, "animationSpeed").min(1).max(20).step(1).name('Animation Speed');
+gui.add(obj, "xStretch").min(0).max(100).step(1).name('X-Stretch');
+gui.add(obj, "yStretch").min(0).max(100).step(1).name('Y-Stretch');
 gui.add(obj, "colorPalette", paletteNames).onFinishChange(changePalette);
 gui.add(obj, "gradient", ["Radial","Linear"]);
 
@@ -306,8 +310,8 @@ function distort(time) {
 
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
-            const dx = Math.sin(y * (Math.sin(adjustedTime/100)+1)/10 + adjustedTime * 0.5) * ((Math.sin(adjustedTime/20)+1)/2 * 200 * Math.sin(adjustedTime/5));
-            const dy = Math.cos(x * 0.01 + adjustedTime * 0.5) * ((Math.cos(adjustedTime/10)+1)/2 * 1000 * Math.cos(adjustedTime/4));
+            const dx = Math.sin(y * (Math.sin(adjustedTime/100)+1)/10 + adjustedTime * 0.3) * ((Math.sin(adjustedTime/20)+1)/2 * obj.xStretch*40 * Math.sin(adjustedTime/5));
+            const dy = Math.cos(x * 0.01 + adjustedTime * 0.25) * ((Math.cos(adjustedTime/10)+1)/2 * obj.yStretch*50 * Math.cos(adjustedTime/4));
 
             let newX = Math.round(x + dx);
             let newY = Math.round(y + dy);
@@ -329,9 +333,17 @@ function distort(time) {
 }
 
 function animate(time) {
-    createGradient(time);
-    distort(time * 0.001);
-    animationRequest = requestAnimationFrame(animate);
+  
+  if(playAnimationToggle==true){
+    playAnimationToggle = false;
+    cancelAnimationFrame(animationRequest);
+    console.log("cancel animation");
+  }//cancel any existing animation loops
+  
+  playAnimationToggle = true;
+  createGradient(time);
+  distort(time * 0.001);
+  animationRequest = requestAnimationFrame(animate);
 }
 
 //MAIN METHOD
@@ -351,14 +363,10 @@ function refreshCanvas(){
       console.log("cancel animation");
   }//cancel any existing animation loops
 
-  playAnimationToggle = true;
   canvas.width = width;
   canvas.height = height;
   canvas.scrollIntoView({behavior:"smooth"});
-
-  // ctx.fillStyle = obj.backgroundColor;
-  // ctx.fillRect(0,0,scaledWidth,scaledHeight);
-  // startAnimation();
+  animationRequest = requestAnimationFrame(animate);
 }
 
 function pausePlayAnimation(){
@@ -368,7 +376,7 @@ function pausePlayAnimation(){
       cancelAnimationFrame(animationRequest);
       console.log("cancel animation");
   } else {
-      startAnimation();
+    animationRequest = requestAnimationFrame(animate);
   }
 }
 
@@ -408,21 +416,6 @@ document.addEventListener('keydown', function(event) {
     }
 
 });
-
-function calcWeightedAverage(data,weights){
-    var weightedAverage = 0;
-    for(var i=0; i<data.length; i++){
-        weightedAverage += data[i]*weights[i];
-    }
-    return weightedAverage;
-}
-
-function resizeTable(){
-    const table = document.getElementById('imageTable'); 
-    // set the width of each column
-    table.getElementsByTagName('td')[0].style.width = `${scaledWidth}px`;
-    table.getElementsByTagName('td')[1].style.width = `${scaledWidth}px`;
-}
 
 function toggleVideoRecord(){
     if(recordVideoState == false){
@@ -614,5 +607,4 @@ function finalizeMobileVideo(e) {
         recordingMessageDiv.classList.add("hidden");
   
     },500);
-  
 }
