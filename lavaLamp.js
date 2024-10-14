@@ -1,12 +1,14 @@
 /* To do:
 
 GUI menu
-- Add button to randomize inputs (r)
 - Custom color palette picker?
 - Custom width / height size, rather than resize based on broweer window?
 - Control the level of randomness (probably should improve the randomness)
 
 Improvements:
+- Max stretch (and other variables?) should be sized based on screen
+- Very laggy on mobile -- doing the above change might fix it
+- On mobile, may need to remove the randomness or make other performance tweaks
 - Other movement modes? Toggle for movement. Change the dx / dy logic to create different kinds of shapes (rectangles, more irregular patterns?)
 - Other styles for the background image? Other gradient type, non-gradient, random image, input image??
 - Glitching / visual randomness / noise
@@ -140,6 +142,10 @@ const colorPalettes = [
     "name": "Inferno",
     "palette": ["#fcffa4", "#f98e09", "#bc3754", "#57106e", "#000004"],
   },
+  {
+    "name": "black&white",
+    "palette": ["#ffffff", "#000000", "#ffffff", "#000000", "#ffffff"],
+  },
 ]
 
 const paletteNames = [];
@@ -196,10 +202,13 @@ var videofps = 20;
 
 //add gui
 var obj = {
-    animationSpeed: 5,
+    animationSpeed: 10,
     xStretch: 8,
+    xSize: 35,
     yStretch: 12,
+    ySize: 20,
     colorPalette: "Rushmore1",
+    movementType: "Wave",
     gradient: "Radial",
 };
 
@@ -208,10 +217,18 @@ var gui = new dat.gui.GUI( { autoPlace: false } );
 var guiOpenToggle = true;
 
 gui.add(obj, "animationSpeed").min(1).max(20).step(1).name('Animation Speed');
-gui.add(obj, "xStretch").min(0).max(100).step(1).name('X-Stretch');
-gui.add(obj, "yStretch").min(0).max(100).step(1).name('Y-Stretch');
-gui.add(obj, "colorPalette", paletteNames).onFinishChange(changePalette);
-gui.add(obj, "gradient", ["Radial","Linear"]);
+gui.add(obj, "xStretch").min(0).max(100).step(1).name('X-Stretch').listen();
+gui.add(obj, "xSize").min(1).max(100).step(1).name('X-Size').listen();
+gui.add(obj, "yStretch").min(0).max(100).step(1).name('Y-Stretch').listen();
+gui.add(obj, "ySize").min(1).max(100).step(1).name('Y-Size').listen();
+gui.add(obj, "colorPalette", paletteNames).onFinishChange(changePalette).listen();
+gui.add(obj, "movementType", ["Wave","Grid","Test"]).listen();
+gui.add(obj, "gradient", ["Radial","Linear"]).listen();
+
+obj['randomizeInputs'] = function () {
+  randomizeInputs();
+};
+gui.add(obj, 'randomizeInputs').name("Randomize Inputs (r)");
 
 obj['playAnimation'] = function () {
     pausePlayAnimation();
@@ -290,14 +307,26 @@ function createGradient(time) {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
+    /*
+    gradientBackgroundImage = ctx.getImageData(0, 0, width, height);
+    const data = gradientBackgroundImage.data;
+
     //Add random noise pixels
     for(i=0; i<100; i++){
-      let x = Math.random()*width;
-      let y = Math.random()*height;
-      let randomColor = colorSets[0][Math.floor(Math.random()*colorSets[0].length)];
-      ctx.fillStyle = randomColor;
+      let x = Math.floor(Math.random()*width);
+      let y = Math.floor(Math.random()*height);
+      let r = data[(y*width+x)*4] + Math.random()*100 - 50;
+      let g = data[(y*width+x)*4 +1] + Math.random()*100 - 50;
+      let b = data[(y*width+x)*4 +2] + Math.random()*100 - 50;
+      //let currentColor = rgbToHex(r,g,b);
+      //let newColor = tweakHexColor(currentColor,100);
+      let newColor = "rgb("+r+","+g+","+b+")";
+
+      //let randomColor = colorSets[0][Math.floor(Math.random()*colorSets[0].length)];
+      ctx.fillStyle = newColor;
       ctx.fillRect(x,y,1,1);
     }
+    */
 
     gradientBackgroundImage = ctx.getImageData(0, 0, width, height);
 }
@@ -310,8 +339,23 @@ function distort(time) {
 
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
-            const dx = Math.sin(y * (Math.sin(adjustedTime/100)+1)/10 + adjustedTime * 0.3) * ((Math.sin(adjustedTime/20)+1)/2 * obj.xStretch*40 * Math.sin(adjustedTime/5));
-            const dy = Math.cos(x * 0.01 + adjustedTime * 0.25) * ((Math.cos(adjustedTime/10)+1)/2 * obj.yStretch*50 * Math.cos(adjustedTime/4));
+            
+            let dx, dy;
+          
+            if(obj.movementType == "Wave"){
+              dx = Math.sin(y / obj.xSize * (Math.sin(adjustedTime/100)+1)/10 + adjustedTime * 0.25) * ((Math.sin(adjustedTime/20)+1)/2  * Math.sin(adjustedTime/5)) * obj.xStretch*40;
+              dy = Math.cos(x / obj.ySize + adjustedTime * 0.3) * ((Math.cos(adjustedTime/10)+1)/2  * Math.cos(adjustedTime/4)) * obj.yStretch*50;  
+            } else if(obj.movementType == "Grid") {
+              //dx = Math.sin(time/8 + x/obj.xSize) * obj.xStretch * (Math.sin(time/2)+1) * 20;
+              //dy = Math.cos(time/6 + y/obj.ySize) * obj.yStretch * (Math.cos(time/3)+1) * 20;
+
+              dx = Math.sin(adjustedTime/3 + x/obj.xSize) * obj.xStretch * (Math.sin(time)+1) * 20;
+              dy = Math.cos(adjustedTime/4 + y/obj.ySize) * obj.xStretch * (Math.cos(time)+1) * 20;              
+            
+            } else if(obj.movementType == "Test"){
+              dx = Math.sin(x/10+adjustedTime/20) * obj.xStretch;
+              dy = Math.cos(y/10+adjustedTime/20) * obj.yStretch;
+            }
 
             let newX = Math.round(x + dx);
             let newY = Math.round(y + dy);
@@ -322,10 +366,27 @@ function distort(time) {
             const sourceIndex = (newY * width + newX) * 4;
             const targetIndex = (y * width + x) * 4;
 
+            const colorRange = 50;
+
             data[targetIndex] = originalData[sourceIndex];
             data[targetIndex + 1] = originalData[sourceIndex + 1];
             data[targetIndex + 2] = originalData[sourceIndex + 2];
             data[targetIndex + 3] = 255;
+
+            /*
+            if(Math.random()<0.95){
+              data[targetIndex] = originalData[sourceIndex];
+              data[targetIndex + 1] = originalData[sourceIndex + 1];
+              data[targetIndex + 2] = originalData[sourceIndex + 2];
+              data[targetIndex + 3] = 255;
+            } else {
+              data[targetIndex] = originalData[sourceIndex] + Math.random()*colorRange - colorRange/2;
+              data[targetIndex + 1] = originalData[sourceIndex + 1] + Math.random()*colorRange - colorRange/2;
+              data[targetIndex + 2] = originalData[sourceIndex + 2] + Math.random()*colorRange - colorRange/2;
+              data[targetIndex + 3] = 255;
+            }
+            */
+
         }
     }
 
@@ -334,13 +395,17 @@ function distort(time) {
 
 function animate(time) {
   
-  if(playAnimationToggle==true){
-    playAnimationToggle = false;
-    cancelAnimationFrame(animationRequest);
-    console.log("cancel animation");
-  }//cancel any existing animation loops
+  // if(playAnimationToggle==true){
+  //   playAnimationToggle = false;
+  //   cancelAnimationFrame(animationRequest);
+  //   console.log("cancel animation");
+  // }//cancel any existing animation loops
   
   playAnimationToggle = true;
+
+  //ctx.fillStyle = "black";
+  //ctx.fillRect(0,0,width,height);
+
   createGradient(time);
   distort(time * 0.001);
   animationRequest = requestAnimationFrame(animate);
@@ -353,6 +418,24 @@ generateColorSetCycle(colorPalettes[2].palette);
 animationRequest = requestAnimationFrame(animate);
 
 //HELPER FUNCTIONS
+
+function randomizeInputs(){
+  console.log("Randomize inputs");
+  obj.xStretch = Math.random() * 100;
+  obj.xSize = Math.random() * 100;
+  obj.yStretch = Math.random() * 100;
+  obj.ySize = Math.random() * 100;
+
+  if(Math.random() < 0.5) {
+    obj.movementType = "Wave";
+  } else {
+    obj.movementType = "Grid";
+  }
+  
+  obj.colorPalette = colorPalettes[Math.floor(Math.random() * colorPalettes.length)].name;
+  changePalette();
+}
+
 function refreshCanvas(){
 
   console.log("refresh");
@@ -404,7 +487,7 @@ function toggleGUI(){
 document.addEventListener('keydown', function(event) {
 
     if (event.key === 'r') {
-        refreshCanvas();
+        randomizeInputs();
     } else if (event.key === 's') {
         saveImage();
     } else if (event.key === 'v') {
